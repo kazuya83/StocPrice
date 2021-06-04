@@ -39,7 +39,7 @@ def ConvertTimestampToStringDate(timstamp):
     return seriesobject[0]
 
 st.title('Stock Price Analysis')
-text = st.text_input('Search for symbols or companies')
+text = st.text_input('Search for brand code')
 if text is not None and len(text) != 0:
     st.write('「' + text,'」 Searching ...')
         
