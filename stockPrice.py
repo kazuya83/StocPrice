@@ -9,9 +9,6 @@ import numpy as np
 import pandas as pd
 import pandas.tseries.offsets as offsets
 import streamlit as st
-import talib as ta
-import matplotlib.pyplot as plt
-import copy
 
 class Model(nn.Module):
     def __init__(self, input=1, h=50, output=1):
