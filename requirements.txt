@@ -2,7 +2,6 @@ streamlit
 streamlit-folium
 pandas
 pandas-datareader
-selenium
 torch
 numpy
 scikit-learn

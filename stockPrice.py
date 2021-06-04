@@ -1,7 +1,5 @@
 from sklearn.preprocessing import MinMaxScaler
 from pandas_datareader import data
-from selenium import webdriver
-from selenium.webdriver.chrome.options import Options
 from time import sleep
 import torch
 import torch.nn as nn
@@ -41,34 +39,12 @@ def ConvertTimestampToStringDate(timstamp):
     return seriesobject[0]
 
 st.title('Stock Price Analysis')
-brandCode = ""
 text = st.text_input('Search for symbols or companies')
 if text is not None and len(text) != 0:
     st.write('「' + text,'」 Searching ...')
-    options = Options()
-    options.add_argument('--headless')
-    driver = webdriver.Chrome(chrome_options=options)
-    driver.get('https://profile.yahoo.co.jp/')
-    search = driver.find_element_by_id('searchTextCom')
-    search.send_keys(text)
-    driver.find_element_by_id('searchButtonCom').click()
-    sleep(1)
-    count = len(driver.find_elements_by_class_name('yjL'))
-    if count > 0:
-        isGet = True
-        brandInfoStr = "Company Infomation：" + driver.find_element_by_class_name('yjL').text
-    else:
-        isGet = False
-        brandInfoStr = "Not Found"
-    st.write(brandInfoStr)
-    driver.quit()
-    if isGet:
-        strLen = len(brandInfoStr)
-        brandCode = brandInfoStr[(strLen - 5):(strLen - 1)]
-        st.write("Symbol code：" + brandCode)
         
-if len(brandCode) != 0:
-    stock_data = data.DataReader(brandCode + '.JP', 'stooq').sort_values('Date', ascending=True)
+if len(text) == 4:
+    stock_data = data.DataReader(text + '.JP', 'stooq').sort_values('Date', ascending=True)
     st.write('Current stock price')
     stock_data
     stock_data = stock_data.drop(['Open', 'High', 'Low', 'Volume'], axis=1)
