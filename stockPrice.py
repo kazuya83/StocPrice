@@ -44,109 +44,112 @@ if text is not None and len(text) != 0:
     st.write('「' + text,'」 Searching ...')
         
 if len(text) == 4:
-    stock_data = data.DataReader(text + '.JP', 'stooq').sort_values('Date', ascending=True)
-    st.write('Current stock price')
-    stock_data
-    stock_data = stock_data.drop(['Open', 'High', 'Low', 'Volume'], axis=1)
-    st.line_chart(stock_data)
-    # データの正規化
-    y = stock_data['Close'].values
-    scaler = MinMaxScaler(feature_range=(-1,1))
-    scaler.fit(y.reshape(-1,1))
-    y = scaler.transform(y.reshape(-1,1))
-    y = torch.FloatTensor(y).view(-1)
-    
-    train_window_size = 7
-    def input_data(seq, ws):
-        out = []
-        L = len(seq)
-        for i in range(L-ws):
-            window = seq[i:i+ws]
-            label = seq[i+ws:i+ws+1]
-            out.append((window, label))
-        return out
+    if len(data.DataReader(text + '.JP', 'stooq')) == 0:
+        st.write('That brand code does not exist.')
+    else:
+        stock_data = data.DataReader(text + '.JP', 'stooq').sort_values('Date', ascending=True)
+        st.write('Current stock price')
+        stock_data
+        stock_data = stock_data.drop(['Open', 'High', 'Low', 'Volume'], axis=1)
+        st.line_chart(stock_data)
+        # データの正規化
+        y = stock_data['Close'].values
+        scaler = MinMaxScaler(feature_range=(-1,1))
+        scaler.fit(y.reshape(-1,1))
+        y = scaler.transform(y.reshape(-1,1))
+        y = torch.FloatTensor(y).view(-1)
+        
+        train_window_size = 7
+        def input_data(seq, ws):
+            out = []
+            L = len(seq)
+            for i in range(L-ws):
+                window = seq[i:i+ws]
+                label = seq[i+ws:i+ws+1]
+                out.append((window, label))
+            return out
 
-    # 直近までの全てのデータをトレーニング用としてモデルに渡す
-    train_data = input_data(y, train_window_size)
-    
-    torch.manual_seed(123)
-    model = Model()
-    
-    # mean auqrer error loss 平均二乗誤作法
-    criterion = nn.MSELoss()
-    
-    # stocastic gradient descent 確率的勾配降下法
-    optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
-    
-    def run_train():
-        for train_window, correct_label in train_data:
-            optimizer.zero_grad()
-            
-            model.hidden = (
-                torch.zeros(1,1,model.hidden_size),
-                torch.zeros(1,1,model.hidden_size)
-            )
-            
-            train_predicted_label = model.forward(train_window)
-            train_loss = criterion(train_predicted_label,correct_label)
-            
-            train_loss.backward()
-            optimizer.step()
-            
-    test_size = 30
-    
-    def run_test():
-        for i in range(test_size):
-            test_window = torch.FloatTensor(extending_seq[-test_size:])
-            
-            with torch.no_grad():
+        # 直近までの全てのデータをトレーニング用としてモデルに渡す
+        train_data = input_data(y, train_window_size)
+        
+        torch.manual_seed(123)
+        model = Model()
+        
+        # mean auqrer error loss 平均二乗誤作法
+        criterion = nn.MSELoss()
+        
+        # stocastic gradient descent 確率的勾配降下法
+        optimizer = torch.optim.SGD(model.parameters(), lr=0.01)
+        
+        def run_train():
+            for train_window, correct_label in train_data:
+                optimizer.zero_grad()
+                
                 model.hidden = (
                     torch.zeros(1,1,model.hidden_size),
                     torch.zeros(1,1,model.hidden_size)
                 )
-                test_predicted_label = model.forward(test_window)
-                extending_seq.append(test_predicted_label.item())
                 
-    epochs = 20
-    
-    st.write('Machine learing...')
-    for epoch in range(epochs):
-        print()
-        print(f'Epoch: {epoch+1}')
+                train_predicted_label = model.forward(train_window)
+                train_loss = criterion(train_predicted_label,correct_label)
+                
+                train_loss.backward()
+                optimizer.step()
+                
+        test_size = 30
         
-        run_train()
+        def run_test():
+            for i in range(test_size):
+                test_window = torch.FloatTensor(extending_seq[-test_size:])
+                
+                with torch.no_grad():
+                    model.hidden = (
+                        torch.zeros(1,1,model.hidden_size),
+                        torch.zeros(1,1,model.hidden_size)
+                    )
+                    test_predicted_label = model.forward(test_window)
+                    extending_seq.append(test_predicted_label.item())
+                    
+        epochs = 20
         
-        extending_seq = y[-test_size:].tolist()
+        st.write('Machine learing...')
+        for epoch in range(epochs):
+            print()
+            print(f'Epoch: {epoch+1}')
+            
+            run_train()
+            
+            extending_seq = y[-test_size:].tolist()
+            
+            run_test()
         
-        run_test()
-    
-    # 未来のデータの数値を、株価のスケールに変換する
-    predicted_normalized_labels_list = extending_seq[-test_size:]
-    predicted_normalized_labels_array_1d = np.array(predicted_normalized_labels_list)
-    predicted_normalized_labels_array_2d = predicted_normalized_labels_array_1d.reshape(-1,1)
-    predicted_labels_array_2d = scaler.inverse_transform(predicted_normalized_labels_array_2d)
-    
-    # 直近データの最終日
-    real_last_date_timestamp = stock_data.index[-1]
-    # 未来日の最初の日付(str型)
-    future_first_date_str = ConvertTimestampToStringDate(real_last_date_timestamp + offsets.Day())
-    # 未来の最後の翌日の日付
-    second_argument_date_str = ConvertTimestampToStringDate(real_last_date_timestamp + offsets.Day(31))
-    future_period = np.arange(future_first_date_str, second_argument_date_str, dtype='datetime64')
-    
-    # 未来予測のデータをpandasデータに変換
-    predict_pd = pd.DataFrame(
-        {'Close':np.ravel(predicted_labels_array_2d)}
-        ,index=np.ravel(future_period)
-    )
-    st.write()
-    st.write('Stock price forecast')
-    predict_pd
-    for idx in range(len(future_period)):
-        stock_data.loc[future_period[idx]] = predicted_labels_array_2d[idx]
-    # stock_data = stock_data.append(predict_pd)
-    
-    st.line_chart(stock_data)
+        # 未来のデータの数値を、株価のスケールに変換する
+        predicted_normalized_labels_list = extending_seq[-test_size:]
+        predicted_normalized_labels_array_1d = np.array(predicted_normalized_labels_list)
+        predicted_normalized_labels_array_2d = predicted_normalized_labels_array_1d.reshape(-1,1)
+        predicted_labels_array_2d = scaler.inverse_transform(predicted_normalized_labels_array_2d)
+        
+        # 直近データの最終日
+        real_last_date_timestamp = stock_data.index[-1]
+        # 未来日の最初の日付(str型)
+        future_first_date_str = ConvertTimestampToStringDate(real_last_date_timestamp + offsets.Day())
+        # 未来の最後の翌日の日付
+        second_argument_date_str = ConvertTimestampToStringDate(real_last_date_timestamp + offsets.Day(31))
+        future_period = np.arange(future_first_date_str, second_argument_date_str, dtype='datetime64')
+        
+        # 未来予測のデータをpandasデータに変換
+        predict_pd = pd.DataFrame(
+            {'Close':np.ravel(predicted_labels_array_2d)}
+            ,index=np.ravel(future_period)
+        )
+        st.write()
+        st.write('Stock price forecast')
+        predict_pd
+        for idx in range(len(future_period)):
+            stock_data.loc[future_period[idx]] = predicted_labels_array_2d[idx]
+        # stock_data = stock_data.append(predict_pd)
+        
+        st.line_chart(stock_data)
     
     
 
