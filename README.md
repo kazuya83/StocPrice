@@ -1,4 +1,4 @@
-# StocPrice
+# StockPrice
 
 
 Library installation
